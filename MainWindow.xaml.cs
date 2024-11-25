@@ -27,12 +27,50 @@ namespace ImageReviewer
         public string FilePath { get; set; }
     }
 
-    public class FilmstripItem
+    public class FilmstripItem : INotifyPropertyChanged
     {
-        public BitmapSource Image { get; set; }
+        private bool _isSelected;
+        private string _fileName;
+        private BitmapImage _image;
+
+        public BitmapImage Image
+        {
+            get => _image;
+            set
+            {
+                _image = value;
+                OnPropertyChanged(nameof(Image));
+            }
+        }
+
         public string FilePath { get; set; }
-        public string FileName { get; set; }
-        public bool IsSelected { get; set; }
+
+        public string FileName
+        {
+            get => _fileName;
+            set
+            {
+                _fileName = value;
+                OnPropertyChanged(nameof(FileName));
+            }
+        }
+
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                _isSelected = value;
+                OnPropertyChanged(nameof(IsSelected));
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     public partial class MainWindow : Window
@@ -105,43 +143,45 @@ namespace ImageReviewer
             }
         }
 
-        private async Task LoadImagesFromDirectory(string path)
+        private async Task LoadImagesFromDirectory(string directoryPath)
         {
-            loadingGrid.Visibility = Visibility.Visible;
-            imgMain.Source = null;
             _filmstripItems.Clear();
+            _selectedImages.Clear();
+            _selectedImagesList.Clear();
 
-            try
+            var imageFiles = Directory.GetFiles(directoryPath)
+                .Where(file => file.ToLower().EndsWith(".jpg") || 
+                              file.ToLower().EndsWith(".jpeg") || 
+                              file.ToLower().EndsWith(".png") || 
+                              file.ToLower().EndsWith(".gif"))
+                .ToList();
+
+            if (imageFiles.Count == 0)
             {
-                var imageFiles = Directory.GetFiles(path)
-                    .Where(file => file.ToLower().EndsWith(".jpg") ||
-                                 file.ToLower().EndsWith(".jpeg") ||
-                                 file.ToLower().EndsWith(".png") ||
-                                 file.ToLower().EndsWith(".gif") ||
-                                 file.ToLower().EndsWith(".bmp"))
-                    .ToList();
-
-                foreach (var file in imageFiles)
-                {
-                    var image = await Task.Run(() => LoadImage(file, 120));
-                    _filmstripItems.Add(new FilmstripItem
-                    {
-                        Image = image,
-                        FilePath = file,
-                        FileName = Path.GetFileName(file),
-                        IsSelected = _selectedImages.Contains(file)
-                    });
-                }
-
-                if (_filmstripItems.Any())
-                {
-                    lvFilmstrip.SelectedIndex = 0;
-                }
+                MessageBox.Show("Keine Bilder im ausgewählten Ordner gefunden.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
             }
-            finally
+
+            loadingGrid.Visibility = Visibility.Visible;
+
+            foreach (var imagePath in imageFiles)
             {
-                loadingGrid.Visibility = Visibility.Collapsed;
+                var item = new FilmstripItem
+                {
+                    FilePath = imagePath,
+                    FileName = Path.GetFileName(imagePath),
+                    Image = LoadImage(imagePath, 100),
+                    IsSelected = false
+                };
+                _filmstripItems.Add(item);
             }
+
+            if (_filmstripItems.Count > 0)
+            {
+                lvFilmstrip.SelectedIndex = 0;
+            }
+
+            loadingGrid.Visibility = Visibility.Collapsed;
         }
 
         private bool IsImageFile(string filePath)
@@ -255,12 +295,12 @@ namespace ImageReviewer
                 if (_selectedImages.Contains(item.FilePath))
                 {
                     _selectedImages.Remove(item.FilePath);
-                    RemoveFromSelectedPanel(item.FilePath);
+                    RemoveFromSelectedPanel(item);
                 }
                 else
                 {
                     _selectedImages.Add(item.FilePath);
-                    AddToSelectedPanel(item.FilePath);
+                    AddToSelectedPanel(item);
                 }
                 item.IsSelected = !item.IsSelected;
                 CollectionViewSource.GetDefaultView(_filmstripItems).Refresh();
@@ -277,18 +317,20 @@ namespace ImageReviewer
 
         private void ToggleImageSelection()
         {
-            if (_imageFiles.Count == 0) return;
+            if (lvFilmstrip.SelectedItem is FilmstripItem item)
+            {
+                item.IsSelected = !item.IsSelected;
+                
+                if (item.IsSelected)
+                {
+                    AddToSelectedPanel(item);
+                }
+                else
+                {
+                    RemoveFromSelectedPanel(item);
+                }
 
-            string currentImage = _imageFiles[_currentImageIndex];
-            if (_selectedImages.Contains(currentImage))
-            {
-                _selectedImages.Remove(currentImage);
-                RemoveFromSelectedPanel(currentImage);
-            }
-            else
-            {
-                _selectedImages.Add(currentImage);
-                AddToSelectedPanel(currentImage);
+                CenterSelectedItem();
             }
         }
 
@@ -305,9 +347,22 @@ namespace ImageReviewer
             });
         }
 
-        private void RemoveFromSelectedPanel(string imagePath)
+        private void AddToSelectedPanel(FilmstripItem item)
         {
-            var imageToRemove = _selectedImagesList.FirstOrDefault(img => img.FilePath == imagePath);
+            var thumbnailImage = item.Image;
+            var originalImage = LoadImage(item.FilePath, 0, true);
+
+            _selectedImagesList.Add(new SelectedImage
+            {
+                Image = thumbnailImage,
+                OriginalImage = originalImage,
+                FilePath = item.FilePath
+            });
+        }
+
+        private void RemoveFromSelectedPanel(FilmstripItem item)
+        {
+            var imageToRemove = _selectedImagesList.FirstOrDefault(img => img.FilePath == item.FilePath);
             if (imageToRemove != null)
             {
                 _selectedImagesList.Remove(imageToRemove);
@@ -319,7 +374,54 @@ namespace ImageReviewer
             if (lvFilmstrip.SelectedItem is FilmstripItem item)
             {
                 imgMain.Source = LoadImage(item.FilePath, 0);
+                CenterSelectedItem();
             }
+        }
+
+        private void CenterSelectedItem()
+        {
+            if (lvFilmstrip.SelectedItem != null)
+            {
+                lvFilmstrip.ScrollIntoView(lvFilmstrip.SelectedItem);
+                
+                // Warte kurz, bis das Scrollen abgeschlossen ist
+                Task.Delay(50).ContinueWith(_ =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        var selectedIndex = lvFilmstrip.SelectedIndex;
+                        if (selectedIndex >= 0)
+                        {
+                            var scrollViewer = GetScrollViewer(lvFilmstrip);
+                            if (scrollViewer != null)
+                            {
+                                var itemWidth = 120; // Ungefähre Breite eines Items inkl. Margin
+                                var offset = selectedIndex * itemWidth;
+                                var viewportWidth = scrollViewer.ViewportWidth;
+                                
+                                // Zentriere das ausgewählte Item
+                                scrollViewer.ScrollToHorizontalOffset(offset - (viewportWidth - itemWidth) / 2);
+                            }
+                        }
+                    });
+                });
+            }
+        }
+
+        private ScrollViewer GetScrollViewer(DependencyObject element)
+        {
+            if (element is ScrollViewer scrollViewer)
+                return scrollViewer;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(element); i++)
+            {
+                var child = VisualTreeHelper.GetChild(element, i);
+                var result = GetScrollViewer(child);
+                if (result != null)
+                    return result;
+            }
+
+            return null;
         }
 
         private void BtnSelectExportFolder_Click(object sender, RoutedEventArgs e)
