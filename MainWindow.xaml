@@ -6,12 +6,10 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:local="clr-namespace:ImageReviewer"
         mc:Ignorable="d"
-        Title="Image Reviewer"
-        Height="1200" Width="800"
+        Title="Image Reviewer" Height="800" Width="1200"
         WindowStartupLocation="CenterScreen"
-        Icon="/app.ico"
-        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         Background="{DynamicResource MaterialDesignPaper}"
+        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         TextElement.FontWeight="Regular"
         TextElement.FontSize="13"
         TextOptions.TextFormattingMode="Ideal"
@@ -64,10 +62,11 @@
                         Width="130"
                         DockPanel.Dock="Left"
                         Style="{StaticResource ModernButton}"/>
-                <TextBox x:Name="txtCurrentPath" 
+                <TextBox x:Name="txtCurrentPath"
                          IsReadOnly="True" 
-                         Margin="8,0,0,0"
-                         Style="{StaticResource ModernTextBox}"/>
+                         Margin="8,10,0,4"
+                         FontSize="16"
+                         Style="{StaticResource ModernTextBox}" TextChanged="txtCurrentPath_TextChanged"/>
             </DockPanel>
 
             <!-- Hauptbild -->
@@ -78,7 +77,7 @@
                     <Image x:Name="imgMain"
                            Stretch="Uniform"
                            RenderOptions.BitmapScalingMode="HighQuality"
-                           Margin="8"/>
+                           Margin="8,8,8,-6"/>
                     <Grid x:Name="loadingGrid" Visibility="Collapsed">
                         <Rectangle Fill="#80FFFFFF"/>
                         <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
@@ -216,7 +215,8 @@
                                 DockPanel.Dock="Right" 
                                 Margin="8,0,0,0"
                                 Width="40" 
-                                Style="{StaticResource ModernButton}"/>
+                                Style="{StaticResource ModernButton}"
+                                Padding="0"/>
                         <TextBox x:Name="txtExportPath" 
                                  IsReadOnly="True"
                                  Style="{StaticResource ModernTextBox}"/>

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -13,6 +15,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Data;
+using System.Windows.Threading;
 using MessageBox = System.Windows.MessageBox;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
@@ -150,9 +153,9 @@ namespace ImageReviewer
             _selectedImagesList.Clear();
 
             var imageFiles = Directory.GetFiles(directoryPath)
-                .Where(file => file.ToLower().EndsWith(".jpg") || 
-                              file.ToLower().EndsWith(".jpeg") || 
-                              file.ToLower().EndsWith(".png") || 
+                .Where(file => file.ToLower().EndsWith(".jpg") ||
+                              file.ToLower().EndsWith(".jpeg") ||
+                              file.ToLower().EndsWith(".png") ||
                               file.ToLower().EndsWith(".gif"))
                 .ToList();
 
@@ -170,7 +173,7 @@ namespace ImageReviewer
                 {
                     FilePath = imagePath,
                     FileName = Path.GetFileName(imagePath),
-                    Image = LoadImage(imagePath, 100),
+                    Image = (BitmapImage)LoadImage(imagePath, 100), // Explicit cast to BitmapImage
                     IsSelected = false
                 };
                 _filmstripItems.Add(item);
@@ -304,14 +307,19 @@ namespace ImageReviewer
                 }
                 item.IsSelected = !item.IsSelected;
                 CollectionViewSource.GetDefaultView(_filmstripItems).Refresh();
+                e.Handled = true;
             }
             else if (e.Key == Key.Left && lvFilmstrip.SelectedIndex > 0)
             {
                 lvFilmstrip.SelectedIndex--;
+                lvFilmstrip.ScrollIntoView(lvFilmstrip.SelectedItem);
+                e.Handled = true;
             }
             else if (e.Key == Key.Right && lvFilmstrip.SelectedIndex < _filmstripItems.Count - 1)
             {
                 lvFilmstrip.SelectedIndex++;
+                lvFilmstrip.ScrollIntoView(lvFilmstrip.SelectedItem);
+                e.Handled = true;
             }
         }
 
@@ -330,7 +338,7 @@ namespace ImageReviewer
                     RemoveFromSelectedPanel(item);
                 }
 
-                CenterSelectedItem();
+                lvFilmstrip.ScrollIntoView(item);
             }
         }
 
@@ -374,54 +382,8 @@ namespace ImageReviewer
             if (lvFilmstrip.SelectedItem is FilmstripItem item)
             {
                 imgMain.Source = LoadImage(item.FilePath, 0);
-                CenterSelectedItem();
+                lvFilmstrip.ScrollIntoView(item);
             }
-        }
-
-        private void CenterSelectedItem()
-        {
-            if (lvFilmstrip.SelectedItem != null)
-            {
-                lvFilmstrip.ScrollIntoView(lvFilmstrip.SelectedItem);
-                
-                // Warte kurz, bis das Scrollen abgeschlossen ist
-                Task.Delay(50).ContinueWith(_ =>
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        var selectedIndex = lvFilmstrip.SelectedIndex;
-                        if (selectedIndex >= 0)
-                        {
-                            var scrollViewer = GetScrollViewer(lvFilmstrip);
-                            if (scrollViewer != null)
-                            {
-                                var itemWidth = 120; // Ungefähre Breite eines Items inkl. Margin
-                                var offset = selectedIndex * itemWidth;
-                                var viewportWidth = scrollViewer.ViewportWidth;
-                                
-                                // Zentriere das ausgewählte Item
-                                scrollViewer.ScrollToHorizontalOffset(offset - (viewportWidth - itemWidth) / 2);
-                            }
-                        }
-                    });
-                });
-            }
-        }
-
-        private ScrollViewer GetScrollViewer(DependencyObject element)
-        {
-            if (element is ScrollViewer scrollViewer)
-                return scrollViewer;
-
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(element); i++)
-            {
-                var child = VisualTreeHelper.GetChild(element, i);
-                var result = GetScrollViewer(child);
-                if (result != null)
-                    return result;
-            }
-
-            return null;
         }
 
         private void BtnSelectExportFolder_Click(object sender, RoutedEventArgs e)
@@ -464,6 +426,11 @@ namespace ImageReviewer
             {
                 MessageBox.Show($"Fehler beim Exportieren der Bilder: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void txtCurrentPath_TextChanged(object sender, TextChangedEventArgs e)
+        {
+
         }
     }
 }
