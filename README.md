@@ -4,71 +4,51 @@ Eine moderne WPF-Anwendung zur effizienten Bildverwaltung und -auswahl.
 
 ## Features
 
-- **Modernes UI-Design** mit MaterialDesign-Theme
-- **Filmstreifen-Ansicht** für schnelles Durchblättern
-- **Großbildvorschau** des aktuell ausgewählten Bildes
-- **Mehrfachauswahl** von Bildern
-- **Hover-Zoom** für Detailansicht
-- **Tastatursteuerung** für effiziente Navigation
-- **Asynchrones Bildladen** für flüssige Performance
-- **Export-Funktion** für ausgewählte Bilder
+- Modernes UI-Design mit Material Design
+- Schnelle Bildvorschau mit Filmstreifen-Navigation
+- Effiziente Bildauswahl mit Tastatur-Shortcuts
+- Mehrfachauswahl von Bildern für Export
+- Einfache Navigation durch Pfeiltasten
+- Hover-Zoom für detaillierte Bildvorschau
+- Batch-Export ausgewählter Bilder
+
+## Technologien
+
+- .NET 8.0
+- WPF (Windows Presentation Foundation)
+- Material Design für moderne UI
+- Async/Await für performante Bildverarbeitung
 
 ## Systemanforderungen
 
 - Windows 10 oder höher
-- .NET 8.0
-- Mindestens 4GB RAM
-- Grafikkarte mit DirectX 11 Unterstützung
+- .NET 8.0 Runtime
+- 4GB RAM empfohlen
+- DirectX 11 kompatible Grafikkarte
 
 ## Installation
 
-1. Stellen Sie sicher, dass .NET 8.0 SDK installiert ist
-2. Klonen Sie das Repository
-3. Öffnen Sie die Solution in Visual Studio
-4. Führen Sie einen Build aus
+1. Repository klonen
+2. Visual Studio 2022 öffnen
+3. Solution (.sln) öffnen und kompilieren
+4. Programm starten
 
-```bash
-git clone [repository-url]
-cd ImageReviewer
-dotnet build
-```
+## Bedienung
 
-## Verwendung
-
-### Bilder laden
-1. Klicken Sie auf "Ordner wählen"
-2. Wählen Sie einen Ordner mit Bildern aus
-3. Die Bilder werden im Filmstreifen angezeigt
-
-### Navigation
-- **←/→ Pfeiltasten**: Zwischen Bildern navigieren
+- **←/→**: Navigation zwischen Bildern
 - **Leertaste**: Bild auswählen/abwählen
-- **Mausklick**: Bild direkt auswählen
-- **Hover**: Vergrößerte Vorschau anzeigen
+- **Maus-Hover**: Vergrößerte Vorschau
+- **Ordner wählen**: Bilder aus Ordner laden
+- **Export**: Ausgewählte Bilder in Zielordner kopieren
 
-### Bilder exportieren
-1. Wählen Sie die gewünschten Bilder aus
-2. Klicken Sie auf "..." um den Zielordner zu wählen
-3. Klicken Sie auf "Markierte Bilder exportieren"
+## Dependencies
 
-## Technische Details
-
-### Frameworks & Bibliotheken
-- WPF (.NET 8.0)
 - MaterialDesignThemes (v4.9.0)
 - MaterialDesignColors (v2.1.4)
 
-### Architektur
-- MVVM-Pattern
-- Asynchrone Bildverarbeitung
-- Ereignisbasierte UI-Aktualisierung
-- Speicheroptimierte Bildverwaltung
+## Screenshots
 
-### Performance-Optimierungen
-- Lazy Loading von Bildern
-- Thumbnail-Generierung
-- Asynchrones Laden und Verarbeiten
-- Effiziente Speicherverwaltung
+[Screenshots werden später hinzugefügt]
 
 ## Lizenz
 
