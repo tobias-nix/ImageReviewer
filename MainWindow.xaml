@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:local="clr-namespace:ImageReviewer"
+        xmlns:converters="clr-namespace:ImageReviewer.Converters"
         mc:Ignorable="d"
         Title="Image Reviewer" Height="800" Width="1200"
         WindowStartupLocation="CenterScreen"
@@ -23,6 +24,16 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Defaults.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
+            <converters:MetadataFormatter x:Key="MetadataFormatter"/>
+            <converters:ScaleConverter x:Key="ScaleConverter"/>
+
+            <SolidColorBrush x:Key="SelectedBorderBrush" Color="#FF9800"/>
+            <SolidColorBrush x:Key="UnselectedBorderBrush" Color="Transparent"/>
+            
+            <local:BooleanToBrushConverter x:Key="BooleanToBrushConverter" 
+                TrueBrush="{StaticResource SelectedBorderBrush}"
+                FalseBrush="{StaticResource UnselectedBorderBrush}"/>
+
             <Style x:Key="ModernButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
                 <Setter Property="Padding" Value="16,8"/>
                 <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="4"/>
@@ -30,6 +41,7 @@
 
             <Style x:Key="ModernTextBox" TargetType="TextBox" BasedOn="{StaticResource MaterialDesignTextBox}">
                 <Setter Property="Padding" Value="8,4"/>
+                <Setter Property="materialDesign:TextFieldAssist.DecorationVisibility" Value="Hidden"/>
                 <Setter Property="materialDesign:TextFieldAssist.TextFieldCornerRadius" Value="4"/>
             </Style>
 
@@ -48,39 +60,52 @@
 
         <!-- Linke Seite -->
         <Grid Margin="16,16,8,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="150"/>
             </Grid.RowDefinitions>
 
             <!-- Ordnerpfad und Button -->
-            <DockPanel Grid.Row="0" Margin="0,0,0,16">
+            <DockPanel Grid.Row="0" Margin="8,8,8,8">
                 <Button x:Name="btnSelectFolder" 
                         Content="Ordner wählen" 
-                        Margin="4"
+                        Click="BtnSelectFolder_Click"
+                        Style="{StaticResource ModernButton}"
                         Width="130"
-                        DockPanel.Dock="Left"
-                        Style="{StaticResource ModernButton}"/>
+                        DockPanel.Dock="Left"/>
+
                 <TextBox x:Name="txtCurrentPath"
+                         Text="{Binding CurrentPath, UpdateSourceTrigger=PropertyChanged}"
                          IsReadOnly="True" 
-                         Margin="8,10,0,4"
-                         FontSize="16"
-                         Style="{StaticResource ModernTextBox}" TextChanged="txtCurrentPath_TextChanged"/>
+                         Margin="8,10,0,0"
+                         Style="{StaticResource ModernTextBox}"/>
             </DockPanel>
 
             <!-- Hauptbild -->
-            <Border Grid.Row="1" Background="White" CornerRadius="4"
-                    Margin="0,0,0,16"
+            <Border Grid.Row="1" 
+                    Background="White" 
+                    CornerRadius="4"
+                    Margin="8,0,8,8"
                     Effect="{DynamicResource MaterialDesignShadowDepth1}">
                 <Grid>
-                    <Image x:Name="imgMain"
-                           Stretch="Uniform"
-                           RenderOptions.BitmapScalingMode="HighQuality"
-                           Margin="8,8,8,-6"/>
+                    <Viewbox x:Name="imageViewbox" 
+                            Stretch="Uniform"
+                            MaxHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Border}}"
+                            MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Border}}">
+                        <Image x:Name="imgMain"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               RenderTransformOrigin="0.5,0.5"
+                               Stretch="None">
+                        </Image>
+                    </Viewbox>
                     <Grid x:Name="loadingGrid" Visibility="Collapsed">
                         <Rectangle Fill="#80FFFFFF"/>
-                        <ProgressBar Style="{StaticResource MaterialDesignCircularProgressBar}"
+                        <ProgressBar Style="{StaticResource CircularProgressBar}"
                                    Value="0"
                                    IsIndeterminate="True"
                                    Width="48"
@@ -89,13 +114,48 @@
                 </Grid>
             </Border>
 
+            <!-- Sortieroptionen -->
+            <StackPanel Grid.Row="2" 
+                        Orientation="Horizontal" 
+                        Margin="8,0,8,8">
+                <TextBlock Text="Sortierung:" 
+                          VerticalAlignment="Center"
+                          Margin="0,0,8,0"/>
+                <ComboBox x:Name="cbSortOption" 
+                         Width="120"
+                         Margin="0,0,8,0"
+                         SelectionChanged="CbSortOption_SelectionChanged">
+                    <ComboBoxItem Content="Name" IsSelected="True"/>
+                    <ComboBoxItem Content="Datum"/>
+                    <ComboBoxItem Content="Größe"/>
+                </ComboBox>
+                <ToggleButton x:Name="btnSortDirection"
+                            Style="{StaticResource MaterialDesignSwitchToggleButton}"
+                            ToolTip="Sortierrichtung umkehren"
+                            Checked="BtnSortDirection_Checked"
+                            Unchecked="BtnSortDirection_Checked"
+                            Margin="0,0,16,0">
+                    <materialDesign:PackIcon Kind="SortAscending" x:Name="sortIcon"/>
+                </ToggleButton>
+                <Button x:Name="btnRotateImage"
+                        Style="{StaticResource MaterialDesignFloatingActionMiniButton}"
+                        Click="BtnRotateImage_Click"
+                        ToolTip="Bild um 90° drehen">
+                    <materialDesign:PackIcon Kind="RotateRight"/>
+                </Button>
+            </StackPanel>
+
             <!-- Filmstreifen -->
-            <ListView x:Name="lvFilmstrip" Grid.Row="2" 
-                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                      ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                      BorderThickness="0"
-                      Background="White"
-                      Height="150">
+            <ListView x:Name="lvFilmstrip"
+                     Grid.Row="3"
+                     ScrollViewer.HorizontalScrollBarVisibility="Visible"
+                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                     SelectionMode="Single"
+                     SelectionChanged="LvFilmstrip_SelectionChanged"
+                     PreviewKeyDown="MainWindow_PreviewKeyDown"
+                     Background="White"
+                     BorderThickness="0"
+                     Margin="8,0,8,8">
                 <ListView.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel Orientation="Horizontal"/>
@@ -105,24 +165,28 @@
                     <DataTemplate>
                         <StackPanel Margin="4">
                             <Border x:Name="imageBorder" 
-                                    Width="100" 
-                                    Height="100" 
-                                    Margin="2"
+                                    Width="100" Height="100" 
+                                    Background="White"
                                     BorderThickness="2"
                                     BorderBrush="Transparent"
-                                    Background="#F5F5F5">
-                                <Image Source="{Binding Image}" 
+                                    CornerRadius="4"
+                                    Margin="0,0,0,0">
+                                <Border.ToolTip>
+                                    <ToolTip>
+                                        <TextBlock Text="{Binding Metadata, Converter={StaticResource MetadataFormatter}}" 
+                                                 TextWrapping="Wrap"/>
+                                    </ToolTip>
+                                </Border.ToolTip>
+                                <Image Source="{Binding Thumbnail}"
                                        Stretch="Uniform"
                                        RenderOptions.BitmapScalingMode="HighQuality"
-                                       Margin="4"/>
+                                       MouseEnter="Image_MouseEnter"
+                                       MouseLeave="Image_MouseLeave"/>
                             </Border>
-                            <TextBlock Text="{Binding FileName}" 
-                                       HorizontalAlignment="Center"
-                                       TextWrapping="NoWrap"
-                                       MaxWidth="100"
-                                       TextTrimming="CharacterEllipsis"
-                                       Margin="0,4,0,0"
-                                       FontSize="11"/>
+                            <TextBlock Text="{Binding FileName}"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       MaxWidth="100"/>
                         </StackPanel>
                         <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsSelected}" Value="True">
@@ -151,48 +215,48 @@
 
             <!-- Ausgewählte Bilder -->
             <Border Background="White" CornerRadius="4"
-                    Effect="{DynamicResource MaterialDesignShadowDepth1}">
+            Effect="{DynamicResource MaterialDesignShadowDepth1}">
                 <ScrollViewer Margin="8" VerticalScrollBarVisibility="Auto">
                     <ItemsControl x:Name="selectedImagesControl"
-                                VerticalAlignment="Top"
-                                HorizontalAlignment="Left">
+                        VerticalAlignment="Top"
+                        HorizontalAlignment="Left">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Columns="3" 
-                                           VerticalAlignment="Top"
-                                           HorizontalAlignment="Left"/>
+                                   VerticalAlignment="Top"
+                                   HorizontalAlignment="Left"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Grid Margin="4">
                                     <Border x:Name="imageBorder" 
-                                            Background="#F5F5F5" 
-                                            Width="80" Height="80"
-                                            CornerRadius="4"
-                                            Margin="2"
-                                            MouseEnter="Image_MouseEnter"
-                                            MouseLeave="Image_MouseLeave">
+                                    Background="#F5F5F5" 
+                                    Width="80" Height="80"
+                                    CornerRadius="4"
+                                    Margin="2"
+                                    MouseEnter="Image_MouseEnter"
+                                    MouseLeave="Image_MouseLeave">
                                         <Image Source="{Binding Image}" 
-                                               Stretch="Uniform"
-                                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                                       Stretch="Uniform"
+                                       RenderOptions.BitmapScalingMode="HighQuality"/>
                                     </Border>
                                     <Popup x:Name="imagePopup" 
-                                           AllowsTransparency="True" 
-                                           Placement="Right"
-                                           PlacementTarget="{Binding ElementName=imageBorder}"
-                                           IsOpen="False">
+                                   AllowsTransparency="True" 
+                                   Placement="Right"
+                                   PlacementTarget="{Binding ElementName=imageBorder}"
+                                   IsOpen="False">
                                         <Border Background="White" 
-                                                BorderBrush="#2196F3" 
-                                                BorderThickness="2" 
-                                                CornerRadius="4"
-                                                Effect="{DynamicResource MaterialDesignShadowDepth2}">
+                                        BorderBrush="#2196F3" 
+                                        BorderThickness="2" 
+                                        CornerRadius="4"
+                                        Effect="{DynamicResource MaterialDesignShadowDepth2}">
                                             <Image Source="{Binding OriginalImage}" 
-                                                   MaxHeight="600" 
-                                                   MaxWidth="800"
-                                                   Stretch="Uniform"
-                                                   Margin="4"
-                                                   RenderOptions.BitmapScalingMode="HighQuality"/>
+                                           MaxHeight="600" 
+                                           MaxWidth="800"
+                                           Stretch="Uniform"
+                                           Margin="4"
+                                           RenderOptions.BitmapScalingMode="HighQuality"/>
                                         </Border>
                                     </Popup>
                                 </Grid>
@@ -204,26 +268,27 @@
 
             <!-- Export-Bereich -->
             <Border Grid.Row="1" Background="White" Margin="0,16,0,0" CornerRadius="4"
-                    Effect="{DynamicResource MaterialDesignShadowDepth1}">
+            Effect="{DynamicResource MaterialDesignShadowDepth1}">
                 <StackPanel Margin="16">
                     <TextBlock Text="Zielordner:" 
-                               Margin="0,0,0,8"
-                               Style="{StaticResource MaterialDesignTextBlock}"/>
+                       Margin="0,0,0,8"
+                       Style="{StaticResource MaterialDesignTextBlock}"/>
                     <DockPanel Margin="0,0,0,16">
                         <Button x:Name="btnSelectExportFolder" 
-                                Content="..." 
-                                DockPanel.Dock="Right" 
-                                Margin="8,0,0,0"
-                                Width="40" 
-                                Style="{StaticResource ModernButton}"
-                                Padding="0"/>
-                        <TextBox x:Name="txtExportPath" 
-                                 IsReadOnly="True"
-                                 Style="{StaticResource ModernTextBox}"/>
+                        Content="..." 
+                        DockPanel.Dock="Right" 
+                        Margin="8,0,0,0"
+                        Width="40" 
+                        Style="{StaticResource ModernButton}"
+                        Padding="0"/>
+                        <TextBlock x:Name="txtExportPath" 
+                         Text="{Binding ExportPath}"
+                         Style="{StaticResource MaterialDesignTextBlock}"
+                         VerticalAlignment="Center"/>
                     </DockPanel>
                     <Button x:Name="btnExport" 
-                            Content="Markierte Bilder exportieren"
-                            Style="{StaticResource ModernButton}"/>
+                    Content="Markierte Bilder exportieren"
+                    Style="{StaticResource ModernButton}"/>
                 </StackPanel>
             </Border>
         </Grid>

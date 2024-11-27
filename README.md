@@ -56,7 +56,7 @@ MIT License - siehe LICENSE.md
 
 ## Entwickler
 
-Entwickelt von [Ihr Name/Team]
+Entwickelt von Tobias Nix
 
 ## Beitragen
 
