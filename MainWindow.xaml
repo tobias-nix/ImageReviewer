@@ -94,14 +94,10 @@
                     Effect="{DynamicResource MaterialDesignShadowDepth1}">
                 <Grid>
                     <Viewbox x:Name="imageViewbox" 
-                            Stretch="Uniform"
-                            MaxHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=Border}}"
-                            MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=Border}}">
+                            Stretch="Uniform" Margin="8,8,8,8">
                         <Image x:Name="imgMain"
                                RenderOptions.BitmapScalingMode="HighQuality"
-                               RenderTransformOrigin="0.5,0.5"
-                               Stretch="None">
-                        </Image>
+                               Stretch="Uniform"/>
                     </Viewbox>
                     <Grid x:Name="loadingGrid" Visibility="Collapsed">
                         <Rectangle Fill="#80FFFFFF"/>
@@ -201,6 +197,21 @@
                         <Setter Property="Margin" Value="0"/>
                         <Setter Property="Background" Value="Transparent"/>
                         <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListViewItem">
+                                    <Border Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}">
+                                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                          Margin="{TemplateBinding Padding}"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
                     </Style>
                 </ListView.ItemContainerStyle>
             </ListView>
@@ -284,7 +295,13 @@
                         <TextBlock x:Name="txtExportPath" 
                          Text="{Binding ExportPath}"
                          Style="{StaticResource MaterialDesignTextBlock}"
-                         VerticalAlignment="Center"/>
+                         VerticalAlignment="Center"
+                         TextTrimming="CharacterEllipsis"
+                         TextWrapping="NoWrap"
+                         TextAlignment="Left"
+                         Width="Auto"
+                         MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=DockPanel}}"
+                         ToolTip="{Binding ExportPath}"/>
                     </DockPanel>
                     <Button x:Name="btnExport" 
                     Content="Markierte Bilder exportieren"

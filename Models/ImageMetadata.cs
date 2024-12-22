@@ -17,6 +17,8 @@ namespace ImageReviewer.Models
         public string FocalLength { get; set; }
         public string Resolution { get; set; }
         public long FileSize { get; set; }
+        public string FileType { get; set; }
+        public string LensModel { get; set; }
 
         public static ImageMetadata FromFile(string filePath)
         {

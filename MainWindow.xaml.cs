@@ -27,20 +27,20 @@ namespace ImageReviewer
 {
     public class SelectedImage
     {
-        public BitmapSource Image { get; set; }
-        public BitmapSource OriginalImage { get; set; }
-        public string FilePath { get; set; }
-        public string FileName { get; set; }
+        public required BitmapSource Image { get; set; }
+        public required BitmapSource OriginalImage { get; set; }
+        public required string FilePath { get; set; }
+        public required string FileName { get; set; }
     }
 
     public class FilmstripItem : INotifyPropertyChanged
     {
         private bool _isSelected;
-        private string _fileName;
-        private BitmapImage _thumbnail;
-        private ImageMetadata _metadata;
+        private string? _fileName;
+        private BitmapImage? _thumbnail;
+        private ImageMetadata? _metadata;
 
-        public BitmapImage Thumbnail
+        public BitmapImage? Thumbnail
         {
             get => _thumbnail;
             set
@@ -50,9 +50,9 @@ namespace ImageReviewer
             }
         }
 
-        public string FilePath { get; set; }
+        public required string FilePath { get; set; }
 
-        public string FileName
+        public string? FileName
         {
             get => _fileName;
             set
@@ -72,7 +72,7 @@ namespace ImageReviewer
             }
         }
 
-        public ImageMetadata Metadata
+        public ImageMetadata? Metadata
         {
             get => _metadata;
             set
@@ -82,7 +82,7 @@ namespace ImageReviewer
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
@@ -92,11 +92,10 @@ namespace ImageReviewer
 
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        private List<string> _imageFiles;
-        private int _currentImageIndex;
-        private HashSet<string> _selectedImages;
-        private ObservableCollection<SelectedImage> _selectedImagesList;
-        private ObservableCollection<FilmstripItem> _filmstripItems;
+        private List<string> _imageFiles = new();
+        private HashSet<string> _selectedImages = new();
+        private ObservableCollection<SelectedImage> _selectedImagesList = new();
+        private ObservableCollection<FilmstripItem> _filmstripItems = new();
         private readonly Dictionary<string, BitmapImage> _thumbnailCache = new();
         private readonly Dictionary<string, BitmapImage> _imageCache = new();
         private const int ThumbnailSize = 120;
@@ -111,7 +110,7 @@ namespace ImageReviewer
 
         private SortOption _currentSortOption = SortOption.Name;
         private bool _sortDescending = false;
-        private string _exportPath;
+        private string? _exportPath;
         public string ExportPath
         {
             get => _exportPath ?? "Kein Zielordner ausgewählt";
@@ -122,7 +121,7 @@ namespace ImageReviewer
             }
         }
 
-        private string _currentPath;
+        private string? _currentPath;
         public string CurrentPath
         {
             get => _currentPath ?? "Kein Ordner ausgewählt";
@@ -150,7 +149,7 @@ namespace ImageReviewer
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -179,14 +178,14 @@ namespace ImageReviewer
 
         private void AddToSelectedPanel(FilmstripItem item)
         {
-            var thumbnailImage = item.Thumbnail;
-            var originalImage = LoadImage(item.FilePath, 0);
+            if (item.Thumbnail is null || LoadImage(item.FilePath, 0) is null) return;
 
             _selectedImagesList.Add(new SelectedImage
             {
-                Image = thumbnailImage,
-                OriginalImage = originalImage,
-                FilePath = item.FilePath
+                Image = item.Thumbnail,
+                OriginalImage = LoadImage(item.FilePath, 0)!,
+                FilePath = item.FilePath,
+                FileName = Path.GetFileName(item.FilePath)
             });
         }
 
@@ -201,21 +200,31 @@ namespace ImageReviewer
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Space && lvFilmstrip.SelectedItem is FilmstripItem item)
+            if (e.Key == Key.Space && lvFilmstrip.SelectedItem is FilmstripItem selectedItem)
             {
-                if (_selectedImages.Contains(item.FilePath))
+                e.Handled = true; // Wichtig: Muss am Anfang stehen
+
+                // Merke dir das aktuelle Item
+                var currentItem = selectedItem;
+                var currentIndex = lvFilmstrip.SelectedIndex;
+
+                if (_selectedImages.Contains(currentItem.FilePath))
                 {
-                    _selectedImages.Remove(item.FilePath);
-                    RemoveFromSelectedPanel(item);
+                    _selectedImages.Remove(currentItem.FilePath);
+                    RemoveFromSelectedPanel(currentItem);
                 }
                 else
                 {
-                    _selectedImages.Add(item.FilePath);
-                    AddToSelectedPanel(item);
+                    _selectedImages.Add(currentItem.FilePath);
+                    AddToSelectedPanel(currentItem);
                 }
-                item.IsSelected = !item.IsSelected;
-                CollectionViewSource.GetDefaultView(_filmstripItems).Refresh();
-                e.Handled = true;
+
+                // Aktualisiere nur das eine Item, nicht die ganze Collection
+                currentItem.IsSelected = !currentItem.IsSelected;
+
+                // Stelle sicher, dass das aktuelle Item selektiert bleibt
+                lvFilmstrip.SelectedItem = currentItem;
+                lvFilmstrip.ScrollIntoView(currentItem);
             }
         }
 
@@ -266,12 +275,14 @@ namespace ImageReviewer
                 _thumbnailCache.Clear();
                 _imageCache.Clear();
 
+                var supportedExtensions = new[] 
+                { 
+                    ".jpg", ".jpeg", ".png", ".gif", ".bmp",
+                    ".raw", ".nef", ".cr2", ".arw", ".dng"  // Neue Formate
+                };
+
                 var imageFiles = Directory.GetFiles(directoryPath)
-                    .Where(file => file.ToLower().EndsWith(".jpg") || 
-                                 file.ToLower().EndsWith(".jpeg") || 
-                                 file.ToLower().EndsWith(".png") || 
-                                 file.ToLower().EndsWith(".gif") || 
-                                 file.ToLower().EndsWith(".bmp"))
+                    .Where(file => supportedExtensions.Contains(Path.GetExtension(file).ToLower()))
                     .ToList();
 
                 foreach (var file in imageFiles)
@@ -286,7 +297,8 @@ namespace ImageReviewer
                     await Task.Run(() =>
                     {
                         var thumbnail = LoadImage(file, ThumbnailSize);
-                        var metadata = LoadMetadata(file);
+                        var fileInfo = new FileInfo(file);
+                        var metadata = LoadMetadata(file, fileInfo.CreationTime); // Übergebe CreationTime
                         Dispatcher.Invoke(() =>
                         {
                             item.Thumbnail = thumbnail;
@@ -306,7 +318,7 @@ namespace ImageReviewer
             }
         }
 
-        private BitmapImage LoadImage(string path, int maxSize)
+        private BitmapImage? LoadImage(string path, int maxSize)
         {
             try
             {
@@ -317,21 +329,73 @@ namespace ImageReviewer
                     return cachedImage;
                 }
 
-                var image = new BitmapImage();
-                image.BeginInit();
-                image.CacheOption = BitmapCacheOption.OnLoad;
-                image.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-                image.UriSource = new Uri(path);
-                
-                if (maxSize > 0)
-                {
-                    image.DecodePixelWidth = maxSize;
-                }
-                
-                image.EndInit();
-                image.Freeze(); // Macht das Bild threadsicher und verbessert die Performance
+                BitmapImage image = new BitmapImage();
+                var extension = Path.GetExtension(path).ToLower();
 
-                // Cache-Größe überprüfen und ggf. älteste Einträge entfernen
+                // Für RAW-Formate
+                if (extension == ".nef" || extension == ".cr2" || extension == ".arw" || extension == ".raw" || extension == ".dng")
+                {
+                    var decoder = BitmapDecoder.Create(
+                        new Uri(path),
+                        BitmapCreateOptions.DelayCreation,
+                        BitmapCacheOption.None);
+
+                    image.BeginInit();
+                    image.CacheOption = BitmapCacheOption.OnLoad;
+                    image.CreateOptions = BitmapCreateOptions.None;
+                    if (maxSize > 0)
+                    {
+                        image.DecodePixelWidth = maxSize;
+                    }
+                    
+                    // Verwende den eingebetteten Thumbnail für bessere Performance
+                    if (decoder.Frames[0].Thumbnail != null)
+                    {
+                        var frame = decoder.Frames[0].Thumbnail;
+                        using (var stream = new MemoryStream())
+                        {
+                            var encoder = new JpegBitmapEncoder();
+                            encoder.Frames.Add(BitmapFrame.Create(frame));
+                            encoder.Save(stream);
+                            stream.Position = 0;
+                            
+                            image.StreamSource = stream;
+                            image.EndInit();
+                            if (image.CanFreeze) image.Freeze();
+                        }
+                    }
+                    else
+                    {
+                        // Wenn kein Thumbnail verfügbar, nutze das Hauptbild
+                        var frame = decoder.Frames[0];
+                        using (var stream = new MemoryStream())
+                        {
+                            var encoder = new JpegBitmapEncoder();
+                            encoder.Frames.Add(BitmapFrame.Create(frame));
+                            encoder.Save(stream);
+                            stream.Position = 0;
+                            
+                            image.StreamSource = stream;
+                            image.EndInit();
+                            if (image.CanFreeze) image.Freeze();
+                        }
+                    }
+                }
+                else
+                {
+                    // Standard-Bildformate
+                    image.BeginInit();
+                    image.CacheOption = BitmapCacheOption.OnLoad;
+                    image.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                    image.UriSource = new Uri(path);
+                    if (maxSize > 0)
+                    {
+                        image.DecodePixelWidth = maxSize;
+                    }
+                    image.EndInit();
+                    if (image.CanFreeze) image.Freeze();
+                }
+
                 if (cache.Count >= MaxCacheSize)
                 {
                     var oldestKey = cache.Keys.First();
@@ -348,15 +412,23 @@ namespace ImageReviewer
             }
         }
 
-        private ImageMetadata LoadMetadata(string path)
+        private ImageMetadata LoadMetadata(string path, DateTime fileCreationTime)
         {
             try
             {
                 var metadata = new ImageMetadata
                 {
-                    FileName = Path.GetFileName(path),
-                    CreationDate = File.GetCreationTime(path),
-                    FileSize = new FileInfo(path).Length
+                    FileName = Path.GetFileName(path) ?? "Unbekannt",
+                    CreationDate = fileCreationTime, // Verwende das Dateisystem-Datum als Fallback
+                    FileSize = new FileInfo(path).Length,
+                    FileType = Path.GetExtension(path).TrimStart('.').ToUpperInvariant(),
+                    CameraModel = string.Empty,
+                    ExposureTime = string.Empty,
+                    FNumber = string.Empty,
+                    ISOSpeed = string.Empty,
+                    FocalLength = string.Empty,
+                    Resolution = string.Empty,
+                    LensModel = string.Empty
                 };
 
                 using (var fileStream = new FileStream(path, FileMode.Open, FileAccess.Read))
@@ -364,11 +436,40 @@ namespace ImageReviewer
                     var bitmapDecoder = BitmapDecoder.Create(fileStream, BitmapCreateOptions.IgnoreImageCache, BitmapCacheOption.None);
                     var frame = bitmapDecoder.Frames[0];
                     var metadataReader = frame.Metadata as BitmapMetadata;
-                    if (metadataReader != null && !string.IsNullOrEmpty(metadataReader.DateTaken))
+
+                    if (metadataReader != null)
                     {
-                        if (DateTime.TryParse(metadataReader.DateTaken, out DateTime creationDate))
+                        try
                         {
-                            metadata.CreationDate = creationDate;
+                            metadata.CameraModel = GetMetadataValue(metadataReader, "System.Photo.CameraModel") ?? string.Empty;
+                            metadata.LensModel = GetMetadataValue(metadataReader, "System.Photo.LensModel") ?? string.Empty;
+                            
+                            var exposureTime = GetMetadataValue(metadataReader, "System.Photo.ExposureTime");
+                            if (exposureTime != null && double.TryParse(exposureTime, out double exposure))
+                            {
+                                metadata.ExposureTime = exposure >= 1 ? $"{exposure:0.#}s" : $"1/{1/exposure:0}s";
+                            }
+
+                            var fNumber = GetMetadataValue(metadataReader, "System.Photo.FNumber");
+                            if (fNumber != null && double.TryParse(fNumber, out double f))
+                            {
+                                metadata.FNumber = $"f/{f:0.#}";
+                            }
+
+                            metadata.ISOSpeed = GetMetadataValue(metadataReader, "System.Photo.ISOSpeed") ?? string.Empty;
+
+                            // Versuche zuerst EXIF-Datum zu lesen, falls nicht vorhanden, behalte das Dateisystem-Datum
+                            if (!string.IsNullOrEmpty(metadataReader.DateTaken))
+                            {
+                                if (DateTime.TryParse(metadataReader.DateTaken, out DateTime exifDate))
+                                {
+                                    metadata.CreationDate = exifDate;
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Fehler beim Lesen der EXIF-Daten: {ex.Message}");
                         }
                     }
                 }
@@ -379,10 +480,30 @@ namespace ImageReviewer
                 Debug.WriteLine($"Fehler beim Laden der Metadaten für {path}: {ex.Message}");
                 return new ImageMetadata
                 {
-                    FileName = Path.GetFileName(path),
-                    CreationDate = File.GetCreationTime(path),
-                    FileSize = new FileInfo(path).Length
+                    FileName = Path.GetFileName(path) ?? "Unbekannt",
+                    CreationDate = fileCreationTime, // Verwende das übergebene Datum
+                    FileSize = new FileInfo(path).Length,
+                    FileType = Path.GetExtension(path).TrimStart('.').ToUpperInvariant(),
+                    CameraModel = string.Empty,
+                    ExposureTime = string.Empty,
+                    FNumber = string.Empty,
+                    ISOSpeed = string.Empty,
+                    FocalLength = string.Empty,
+                    Resolution = string.Empty,
+                    LensModel = string.Empty
                 };
+            }
+        }
+
+        private string? GetMetadataValue(BitmapMetadata metadata, string query)
+        {
+            try
+            {
+                return metadata.GetQuery(query)?.ToString();
+            }
+            catch
+            {
+                return null;
             }
         }
 
@@ -408,7 +529,6 @@ namespace ImageReviewer
         {
             if (imgMain != null)
             {
-                imgMain.RenderTransform = null;
                 CurrentRotation = 0;
             }
         }
@@ -527,29 +647,62 @@ namespace ImageReviewer
             }
         }
 
-        private void BtnRotateImage_Click(object sender, RoutedEventArgs e)
+        private async void BtnRotateImage_Click(object sender, RoutedEventArgs e)
         {
-            if (imgMain.Source != null)
+            if (imgMain.Source is BitmapSource originalSource)
             {
-                // Erstelle eine neue TransformGroup, falls noch keine existiert
-                if (imgMain.RenderTransform == null || !(imgMain.RenderTransform is TransformGroup))
+                try
                 {
-                    imgMain.RenderTransform = new TransformGroup();
-                }
+                    loadingGrid.Visibility = Visibility.Visible;
+                    
+                    var rotatedBitmap = await Task.Run(() =>
+                    {
+                        // Rotiere im Uhrzeigersinn (negativer Winkel)
+                        var transform = new RotateTransform(90);
+                        var rotated = new TransformedBitmap(originalSource, transform);
+                        rotated.Freeze();
+                        return rotated;
+                    });
 
-                var transformGroup = (TransformGroup)imgMain.RenderTransform;
-                
-                // Suche nach einer existierenden RotateTransform oder erstelle eine neue
-                var rotateTransform = transformGroup.Children.OfType<RotateTransform>().FirstOrDefault();
-                if (rotateTransform == null)
+                    // Konvertiere zu BitmapImage für den Cache
+                    var rotatedBitmapImage = await Task.Run(() =>
+                    {
+                        var encoder = new PngBitmapEncoder();
+                        encoder.Frames.Add(BitmapFrame.Create(rotatedBitmap));
+                        
+                        var bitmapImage = new BitmapImage();
+                        using (var memoryStream = new MemoryStream())
+                        {
+                            encoder.Save(memoryStream);
+                            memoryStream.Seek(0, SeekOrigin.Begin);
+                            
+                            bitmapImage.BeginInit();
+                            bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+                            bitmapImage.StreamSource = memoryStream;
+                            bitmapImage.EndInit();
+                            bitmapImage.Freeze();
+                            return bitmapImage;
+                        }
+                    });
+
+                    // Aktualisiere UI
+                    CurrentRotation = (CurrentRotation - 90 + 360) % 360; // Korrigiere für Uhrzeigersinn
+                    imgMain.Source = rotatedBitmapImage;
+
+                    // Aktualisiere Cache
+                    if (lvFilmstrip.SelectedItem is FilmstripItem selectedItem)
+                    {
+                        _imageCache[selectedItem.FilePath] = rotatedBitmapImage;
+                    }
+                }
+                catch (Exception ex)
                 {
-                    rotateTransform = new RotateTransform();
-                    transformGroup.Children.Add(rotateTransform);
+                    MessageBox.Show($"Fehler beim Rotieren des Bildes: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
-
-                // Rotiere um weitere 90 Grad
-                CurrentRotation = (CurrentRotation + 90) % 360;
-                rotateTransform.Angle = CurrentRotation;
+                finally
+                {
+                    loadingGrid.Visibility = Visibility.Collapsed;
+                }
             }
         }
     }
